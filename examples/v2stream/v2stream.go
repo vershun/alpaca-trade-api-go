@@ -1,10 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"time"
 
-	"github.com/alpacahq/alpaca-trade-api-go/alpaca"
 	"github.com/alpacahq/alpaca-trade-api-go/common"
 	"github.com/alpacahq/alpaca-trade-api-go/v2/stream"
 )
@@ -21,28 +22,26 @@ func main() {
 		os.Setenv(common.EnvApiSecretKey, apiSecret)
 	}
 
+	client, err := stream.NewClient()
+	if err != nil {
+		panic(err)
+	}
+
 	// uncomment if you have PRO subscription
-	// stream.UseFeed("sip")
+	// client.UseFeed("sip")
 
-	if err := stream.SubscribeTradeUpdates(tradeUpdateHandler); err != nil {
-		panic(err)
-	}
+	client.SubscribeTrades(tradeHandler, "AAPL")
+	client.SubscribeQuotes(quoteHandler, "MSFT")
+	client.SubscribeBars(barHandler, "*")
+	client.RegisterRestartHandler(restart)
 
-	if err := stream.SubscribeTrades(tradeHandler, "AAPL"); err != nil {
-		panic(err)
-	}
-	if err := stream.SubscribeQuotes(quoteHandler, "MSFT"); err != nil {
-		panic(err)
-	}
-	if err := stream.SubscribeBars(barHandler, "IBM"); err != nil {
-		panic(err)
-	}
-
-	select {}
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*10)
+	defer cancel()
+	client.Listen(ctx)
 }
 
-func tradeUpdateHandler(update alpaca.TradeUpdate) {
-	fmt.Println("trade update", update)
+func restart() {
+	fmt.Println("websocket connection restarted")
 }
 
 func tradeHandler(trade stream.Trade) {
